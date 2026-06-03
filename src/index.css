@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Noto Serif SC", "Playfair Display", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", "Noto Sans SC", sans-serif;
+  --color-parchment: #fff9ed;
+  --color-parchment-dim: #e2dabf;
+  --color-parchment-low: #fcf3d8;
+  --color-parchment-container: #f7eed2;
+  --color-parchment-high: #f1e8cd;
+  --color-parchment-highest: #ebe2c8;
+  --color-vermilion: #b52424;
+  --color-accent-gold: #c5a059;
+  --color-deep-ink: #1f1c0b;
+}
+
+@layer utilities {
+  .parchment-texture {
+    background-color: var(--color-parchment);
+    background-image: url("https://www.transparenttextures.com/patterns/natural-paper.png");
+    background-repeat: repeat;
+  }
+
+  .ink-mountain-overlay {
+    mask-image: linear-gradient(to top, black 20%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to top, black 20%, transparent 100%);
+    mix-blend-mode: multiply;
+  }
+
+  .vertical-text {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+  }
+}
+
+/* Ensure ultra-crisp text rendering across all web engines */
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(1.5deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+@keyframes shake {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-3px, -2px) rotate(-1.5deg); }
+  20% { transform: translate(3px, 1px) rotate(1deg); }
+  30% { transform: translate(-2px, 3px) rotate(-2deg); }
+  40% { transform: translate(2px, -1px) rotate(1.5deg); }
+  50% { transform: translate(-3px, 1px) rotate(-1deg); }
+  60% { transform: translate(3px, -2px) rotate(2deg); }
+  70% { transform: translate(-1px, 2px) rotate(-1.5deg); }
+  80% { transform: translate(2px, 1px) rotate(1deg); }
+  90% { transform: translate(-2px, -2px) rotate(-1deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+@keyframes burn-smoke {
+  0% { opacity: 0.15; transform: scaleY(1) translateY(0); filter: blur(2px); }
+  50% { opacity: 0.4; transform: scaleY(1.1) translateY(-3px) skewX(2deg); filter: blur(3px); }
+  100% { opacity: 0.15; transform: scaleY(1) translateY(0); filter: blur(2px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-shake {
+  animation: shake 0.6s ease-in-out infinite;
+}
+
+.animate-smoke {
+  animation: burn-smoke 4s ease-in-out infinite;
+}
+
+/* Custom Red Stamp style */
+.zen-stamp {
+  border: 2px double var(--color-vermilion);
+  padding: 4px 6px;
+  color: var(--color-vermilion);
+  font-family: var(--font-serif);
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  border-radius: 2px;
+  transform: rotate(-3deg);
+  display: inline-block;
+}
+
+/* Custom vertical layout for Divination stick result */
+.slip-result-scroll {
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.05);
+}

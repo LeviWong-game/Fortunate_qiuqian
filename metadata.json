@@ -1,0 +1,6 @@
+{
+  "name": "ZenFortune",
+  "description": "An elegant, Zen-inspired Chinese divination app focusing on inner stillness, offering personalized fortune slips, dynamic state interpretations, and a server-side Gemini API generator for spiritual guidance and path-clearing.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
