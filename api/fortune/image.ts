@@ -4,6 +4,8 @@ import { supabaseAdmin } from "../_lib/supabase-admin";
 const DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com/api/v1";
 const dashscopeApiKey = process.env.DASHSCOPE_API_KEY || "";
 
+export const maxDuration = 60; // 允许函数最长运行 60 秒，防止图片生成超时
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");

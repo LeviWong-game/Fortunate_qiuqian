@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { deepseek } from "../_lib/deepseek";
 import { PRESET_SLIPS, CATEGORY_MAP } from "../_lib/preset-slips";
 
+export const maxDuration = 60; // 允许函数最长运行 60 秒，防止大模型超时
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
