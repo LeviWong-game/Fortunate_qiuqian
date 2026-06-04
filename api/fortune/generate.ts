@@ -50,96 +50,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // ── DeepSeek V4 Flash — Two-Stage Role Play ──
   try {
-    // Stage 1: Fortune Teller
-    const fortuneTellerSystemPrompt = `你是一位德高望重、名满天下的华夏占卜宗师与算命师，法号"玄清真人"。
-你精通梅花易数、六爻八卦、紫微斗数、奇门遁甲等传统命理术数，同时具备深厚的禅宗修养和心理疗愈智慧。
-你的占卜风格沉稳厚重、妙语如珠，既有精准的命理判断，又有温暖人心的禅意开导。
+    // Single Stage: Fortune Teller & Poet
+    const systemPrompt = `你是一位德高望重、名满天下的华夏占卜宗师与古典诗词大家。
+你精通梅花易数等传统命理术数，同时擅长七言绝句的创作。
 
 你的核心职责：
 1. 根据用户的问题、心境和近期遭遇，进行深度的命理推演和吉凶预测
-2. 提取或自拟一个4字签题（如"飞龙在天"、"静水流深"、"桃李春风"）
+2. 提取或自拟一个4字签题（如"飞龙在天"、"静水流深"）
 3. 判定气运评级签章（只能从以下选择：上上、大吉、上吉、中吉、中平、下平、下下）
 4. 撰写一段180-250字的深度运势推演（必须结合用户心境和遭遇进行针对性预测）
 5. 提供3条具体的自我调节与身心修养建议
+6. 根据签题和运势意境，创作一首优美典雅、格律工整的四句七言绝句（共28字，加标点）。
 
 你必须严格以 JSON 格式返回，不含任何其他文字：
 {
   "title": "四字签题",
   "stamp": "气运签章",
+  "poetry": "七言绝句诗文...",
   "explanation": "深度运势推演文本...",
   "advice": ["建议一：...", "建议二：...", "建议三：..."]
 }`;
 
-    const fortuneTellerUserPrompt = `当前占卜主题：【${categoryCh}】
+    const userPrompt = `当前占卜主题：【${categoryCh}】
 
 用户状况：
 - 心中疑虑或具体提问：【${question || "未明确求问，祈求本命大势解惑"}】
 - 当前精神或情绪心境：【${mentalState || "平和安宁、静候缘起"}】
 - 近期遭遇的吉凶事件：【${recentEvents || "百态如常，无突出变故"}】
 
-请运用你的命理智慧，为用户进行深度占卜推演。`;
+请运用你的命理智慧与诗词造诣，为用户进行深度占卜推演并赋诗。`;
 
-    const fortuneResponse = await deepseek.chat.completions.create({
+    const response = await deepseek.chat.completions.create({
       model: "deepseek-v4-flash",
       messages: [
-        { role: "system", content: fortuneTellerSystemPrompt },
-        { role: "user", content: fortuneTellerUserPrompt },
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
       ],
       temperature: 0.85,
-      max_tokens: 1200,
+      max_tokens: 1500,
       response_format: { type: "json_object" },
     });
 
-    const fortuneText = fortuneResponse.choices[0]?.message?.content?.trim() || "";
-    const fortuneResult = JSON.parse(fortuneText);
+    const responseText = response.choices[0]?.message?.content?.trim() || "{}";
+    const result = JSON.parse(responseText);
 
-    // Stage 2: Poet
-    const poetSystemPrompt = `你是一位造诣精深的古典诗词大家，号"墨痕居士"。
-你精通唐诗宋词的格律声韵，尤其擅长七言绝句的创作。
-你的诗词风格兼具李白的飘逸洒脱、杜甫的深沉厚重、王维的禅意空灵。
-
-你的核心职责：
-根据给定的签题和运势意境，创作一首优美典雅、格律工整的四句七言绝句（共28字）。
-
-创作要求：
-1. 必须是四句七言（每句恰好7个汉字，共28个汉字）
-2. 必须符合七言绝句的基本平仄韵律，朗朗上口
-3. 意境必须契合签题的气质与运势主题
-4. 用词典雅古朴，避免白话和现代词汇
-5. 格式要求：四句诗之间用逗号或句号分隔，第二句末用逗号，第四句末用句号
-6. 只返回28个汉字的诗句本身加标点，绝对不要返回标题、解释、或任何其他多余内容`;
-
-    const poetUserPrompt = `签题：【${fortuneResult.title || randomSeed.title}】
-运势意境：【${fortuneResult.explanation?.substring(0, 100) || randomSeed.meaning}】
-气运评级：【${fortuneResult.stamp || randomSeed.stamp}】
-
-请为此签题创作一首匹配的七言绝句。严格只返回四句诗（28个汉字加标点），不要有任何其他文字。`;
-
-    const poetResponse = await deepseek.chat.completions.create({
-      model: "deepseek-v4-flash",
-      messages: [
-        { role: "system", content: poetSystemPrompt },
-        { role: "user", content: poetUserPrompt },
-      ],
-      temperature: 0.85,
-      max_tokens: 300,
-    });
-
-    let poetry = poetResponse.choices[0]?.message?.content?.trim() || randomSeed.poetry;
+    let poetry = result.poetry || randomSeed.poetry;
     poetry = poetry.replace(/^[""\"《》\s]+/, "").replace(/[""\"《》\s]+$/, "");
-    if (poetry.length > 60) {
-      const match = poetry.match(/[\u4e00-\u9fff]{7}[，,][\u4e00-\u9fff]{7}[。，,][\u4e00-\u9fff]{7}[，,][\u4e00-\u9fff]{7}[。]/);
-      if (match) poetry = match[0];
-    }
 
     return res.status(200).json({
-      title: fortuneResult.title || randomSeed.title,
+      title: result.title || randomSeed.title,
       poetry,
       category,
       categoryLabel: CATEGORY_MAP[category],
-      stamp: fortuneResult.stamp || randomSeed.stamp,
-      explanation: fortuneResult.explanation || randomSeed.meaning,
-      advice: fortuneResult.advice?.length > 0 ? fortuneResult.advice : [randomSeed.advice]
+      stamp: result.stamp || randomSeed.stamp,
+      explanation: result.explanation || randomSeed.meaning,
+      advice: result.advice?.length > 0 ? result.advice : [randomSeed.advice]
     });
 
   } catch (error) {
