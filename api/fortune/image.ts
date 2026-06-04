@@ -41,24 +41,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 - 不要出现现代元素（铁路、汽车、建筑等）
 - 高品质艺术杰作，博物馆级别的中国画`;
 
-    const submitResponse = await fetch(`${DASHSCOPE_BASE_URL}/services/aigc/multimodal-generation/generation`, {
+    const submitResponse = await fetch(`${DASHSCOPE_BASE_URL}/services/aigc/text2image/image-synthesis`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${dashscopeApiKey}`
+        "Authorization": `Bearer ${dashscopeApiKey}`,
+        "X-DashScope-Async": "enable"
       },
       body: JSON.stringify({
-        model: "wan2.6-t2i",
-        input: {
-          messages: [{ role: "user", content: [{ text: prompt }] }]
-        },
-        parameters: {
-          size: "1280*1280",
-          n: 1,
-          negative_prompt: "铁路,火车轨道,现代建筑,汽车,电线杆,文字,题字,印章,落款,低质量,模糊,AI感,变形",
-          prompt_extend: false,
-          watermark: false
-        }
+        model: "wanx-v1",
+        input: { prompt: prompt },
+        parameters: { size: "1024*1024", n: 1 }
       }),
     });
 
@@ -69,8 +62,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const submitData = await submitResponse.json() as any;
-    const imageUrl = submitData.output?.choices?.[0]?.message?.content?.[0]?.image;
+    const taskId = submitData.output?.task_id;
 
+    if (!taskId) {
+      console.error("[Image] 未获取到 task_id:", JSON.stringify(submitData));
+      return res.status(200).json({ imageUrl: picsumUrl });
+    }
+
+    // Poll for task completion
+    let imageUrl = "";
+    for (let i = 0; i < 25; i++) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const pollResponse = await fetch(`${DASHSCOPE_BASE_URL}/tasks/${taskId}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${dashscopeApiKey}` }
+      });
+      
+      if (!pollResponse.ok) continue;
+      
+      const pollData = await pollResponse.json() as any;
+      const status = pollData.output?.task_status;
+      
+      if (status === "SUCCEEDED") {
+        imageUrl = pollData.output?.results?.[0]?.url;
+        break;
+      } else if (status === "FAILED" || status === "CANCELED") {
+        console.error("[Image] 任务失败:", pollData);
+        break;
+      }
+    }
     if (imageUrl) {
       // Update record in Supabase if recordId provided
       if (recordId && supabaseAdmin) {
@@ -85,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       return res.status(200).json({ imageUrl });
     } else {
-      console.error("[Image] 未能解析到图片URL:", JSON.stringify(submitData));
+      console.error("[Image] 任务失败或超时获取不到URL");
       return res.status(200).json({ imageUrl: picsumUrl });
     }
 

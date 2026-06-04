@@ -83,7 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 请运用你的命理智慧与诗词造诣，为用户进行深度占卜推演并赋诗。`;
 
     const response = await deepseek.chat.completions.create({
-      model: "deepseek-v4-flash",
+      model: "deepseek-chat", // 使用官方正确的模型名称，避免 404 报错
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
