@@ -448,17 +448,18 @@ app.post("/api/fortune/generate", async (req, res) => {
 根据给定的签题和运势意境，创作一首优美典雅、格律工整的四句七言绝句（共28字）。
 
 创作要求：
-1. 必须是四句七言（每句7个汉字，共28字）
+1. 必须是四句七言（每句恰好7个汉字，共28个汉字）
 2. 必须符合七言绝句的基本平仄韵律，朗朗上口
 3. 意境必须契合签题的气质与运势主题
 4. 用词典雅古朴，避免白话和现代词汇
-5. 只需返回诗句本身，四句诗用逗号和句号分隔，不含其他文字`;
+5. 格式要求：四句诗之间用逗号或句号分隔，第二句末用逗号，第四句末用句号
+6. 只返回28个汉字的诗句本身加标点，绝对不要返回标题、解释、或任何其他多余内容`;
 
     const poetUserPrompt = `签题：【${fortuneResult.title || randomSeed.title}】
 运势意境：【${fortuneResult.explanation?.substring(0, 100) || randomSeed.meaning}】
 气运评级：【${fortuneResult.stamp || randomSeed.stamp}】
 
-请为此签题创作一首匹配的七言绝句。只返回诗句本身。`;
+请为此签题创作一首匹配的七言绝句。严格只返回四句诗（28个汉字加标点），不要有任何其他文字。`;
 
     console.log("[ZenFortune] 第二阶段：诗人角色 — 七言绝句创作...");
     const poetResponse = await deepseek.chat.completions.create({
@@ -467,12 +468,23 @@ app.post("/api/fortune/generate", async (req, res) => {
         { role: "system", content: poetSystemPrompt },
         { role: "user", content: poetUserPrompt },
       ],
-      temperature: 0.92,
-      max_tokens: 200,
+      temperature: 0.85,
+      max_tokens: 300,
     });
 
-    const poetry = poetResponse.choices[0]?.message?.content?.trim() || randomSeed.poetry;
-    console.log("[ZenFortune] 诗人创作完成。");
+    let poetry = poetResponse.choices[0]?.message?.content?.trim() || randomSeed.poetry;
+    // Post-process: strip any extra text the model might add (titles, explanations, quotes)
+    // Keep only Chinese characters and punctuation (，。！？、；：)
+    poetry = poetry.replace(/^["""《》\s]+/, "").replace(/["""《》\s]+$/, "");
+    // If the model returned something too long (>60 chars), try to extract just the poem
+    if (poetry.length > 60) {
+      // Try to find four 7-char phrases
+      const match = poetry.match(/[\u4e00-\u9fff]{7}[，,][\u4e00-\u9fff]{7}[。，,][\u4e00-\u9fff]{7}[，,][\u4e00-\u9fff]{7}[。]/);
+      if (match) {
+        poetry = match[0];
+      }
+    }
+    console.log(`[ZenFortune] 诗人创作完成: "${poetry}"`);
 
     return res.json({
       title: fortuneResult.title || randomSeed.title,
@@ -524,15 +536,21 @@ app.post("/api/fortune/image", async (req, res) => {
 
     console.log(`[ZenFortune Image] 通义万相生成中: "${title}"`);
 
-    const prompt = `一幅传统中国水墨画（国画山水风格），表达"${title}"的精神意境："${poetry}"。
-要求：
-- 清雅的水墨笔触，大量留白（计白当黑）
-- 氤氲的雾气、远山近水、松竹梅兰等传统意象
-- 禅意空灵，意境深远
-- 淡彩点缀，整体色调素雅
-- 高品质艺术杰作风格`;
+    const prompt = `传统中国水墨画（工笔国画风格），描绘"${title}"的诗意场景。
+诗句原文："${poetry}"
 
-    // ── Submit generation task (Synchronous) ──
+画面要求：
+- 纯正的中国传统水墨画风格，宣纸质感
+- 水墨渲染技法，墨分五色（焦、浓、重、淡、清）
+- 大面积留白，计白当黑，意境深远
+- 远山近水、云雾缭绕、松竹梅兰等传统国画意象
+- 禅意空灵，古典雅致
+- 淡墨设色，整体色调素雅清幽
+- 不要出现任何文字、题字、印章、落款
+- 不要出现现代元素（铁路、汽车、建筑等）
+- 高品质艺术杰作，博物馆级别的中国画`;
+
+    // ── Submit generation task (Synchronous via wan2.6-t2i) ──
     const submitResponse = await fetch(`${DASHSCOPE_BASE_URL}/services/aigc/multimodal-generation/generation`, {
       method: "POST",
       headers: {
@@ -540,7 +558,7 @@ app.post("/api/fortune/image", async (req, res) => {
         "Authorization": `Bearer ${dashscopeApiKey}`
       },
       body: JSON.stringify({
-        model: "qwen-image-2.0-pro",
+        model: "wan2.6-t2i",
         input: {
           messages: [
             {
@@ -552,8 +570,11 @@ app.post("/api/fortune/image", async (req, res) => {
           ]
         },
         parameters: {
-          size: "1024*1024",
+          size: "1280*1280",
           n: 1,
+          negative_prompt: "铁路,火车轨道,现代建筑,汽车,电线杆,文字,题字,印章,落款,低质量,模糊,AI感,变形",
+          prompt_extend: false,
+          watermark: false
         }
       }),
     });

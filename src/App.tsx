@@ -1353,7 +1353,12 @@ export default function App() {
                             onClick={() => {
                               setCurrentResult(rec);
                               setShowResultModal(true);
-                              retrieveSlipImage(rec);
+                              // Use cached image if available, otherwise generate
+                              if (rec.imageUrl) {
+                                setSlipImage(rec.imageUrl);
+                              } else {
+                                retrieveSlipImage(rec);
+                              }
                             }}
                             className="text-xs text-vermilion font-bold tracking-wider hover:underline inline-flex items-center gap-1 group focus:outline-none"
                           >
