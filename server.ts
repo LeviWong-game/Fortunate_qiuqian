@@ -5,6 +5,12 @@ import dotenv from "dotenv";
 import OpenAI from "openai";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
+import {
+  DASHSCOPE_IMAGE_MODEL,
+  buildDashscopeWan26Payload,
+  buildInkPaintingPrompt,
+  parseDashscopeImageUrl,
+} from "./server/lib/ink-image";
 
 // Load environment variables
 dotenv.config();
@@ -526,69 +532,39 @@ app.post("/api/fortune/image", async (req, res) => {
       return res.status(400).json({ error: "斋心未备：缺少诗歌标题或内容" });
     }
 
-    // High resolution aesthetic background backup image
-    const picsumUrl = `https://picsum.photos/seed/${encodeURIComponent(title)}/600/600`;
-
     if (!dashscopeApiKey) {
-      console.log("[ZenFortune Image] DashScope 未配置。使用占位图片。");
-      return res.json({ imageUrl: picsumUrl });
+      return res.status(503).json({
+        error: "图片生成服务未配置 DASHSCOPE_API_KEY",
+        code: "DASHSCOPE_API_KEY_MISSING",
+      });
     }
 
-    console.log(`[ZenFortune Image] 通义万相生成中: "${title}"`);
+    console.log(`[ZenFortune Image] 通义万相 ${DASHSCOPE_IMAGE_MODEL} 生成中: "${title}"`);
 
-    const prompt = `传统中国水墨画（工笔国画风格），描绘"${title}"的诗意场景。
-诗句原文："${poetry}"
+    const prompt = buildInkPaintingPrompt(title, poetry);
 
-画面要求：
-- 纯正的中国传统水墨画风格，宣纸质感
-- 水墨渲染技法，墨分五色（焦、浓、重、淡、清）
-- 大面积留白，计白当黑，意境深远
-- 远山近水、云雾缭绕、松竹梅兰等传统国画意象
-- 禅意空灵，古典雅致
-- 淡墨设色，整体色调素雅清幽
-- 不要出现任何文字、题字、印章、落款
-- 不要出现现代元素（铁路、汽车、建筑等）
-- 高品质艺术杰作，博物馆级别的中国画`;
-
-    // ── Submit generation task (Synchronous via wan2.6-t2i) ──
     const submitResponse = await fetch(`${DASHSCOPE_BASE_URL}/services/aigc/multimodal-generation/generation`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${dashscopeApiKey}`
       },
-      body: JSON.stringify({
-        model: "wan2.6-t2i",
-        input: {
-          messages: [
-            {
-              role: "user",
-              content: [
-                { text: prompt }
-              ]
-            }
-          ]
-        },
-        parameters: {
-          size: "1280*1280",
-          n: 1,
-          negative_prompt: "铁路,火车轨道,现代建筑,汽车,电线杆,文字,题字,印章,落款,低质量,模糊,AI感,变形",
-          prompt_extend: false,
-          watermark: false
-        }
-      }),
+      body: JSON.stringify(buildDashscopeWan26Payload(prompt)),
     });
 
     if (!submitResponse.ok) {
       const errText = await submitResponse.text();
       console.error("[ZenFortune Image] DashScope 提交失败:", submitResponse.status, errText);
-      return res.json({ imageUrl: picsumUrl });
+      return res.status(502).json({
+        error: "DashScope 图片生成失败",
+        code: "DASHSCOPE_SUBMIT_FAILED",
+        model: DASHSCOPE_IMAGE_MODEL,
+        detail: errText,
+      });
     }
 
     const submitData = await submitResponse.json() as any;
-    
-    // Parse the Qwen-Image-2.0 synchronous response structure
-    const imageUrl = submitData.output?.choices?.[0]?.message?.content?.[0]?.image;
+    const imageUrl = parseDashscopeImageUrl(submitData);
 
     if (imageUrl) {
       console.log(`[ZenFortune Image] 水墨画生成成功！`);
@@ -606,16 +582,22 @@ app.post("/api/fortune/image", async (req, res) => {
         }
       }
 
-      return res.json({ imageUrl });
+      return res.json({ imageUrl, model: DASHSCOPE_IMAGE_MODEL });
     } else {
       console.error("[ZenFortune Image] 生成成功但未能解析到图片URL:", JSON.stringify(submitData));
-      return res.json({ imageUrl: picsumUrl });
+      return res.status(502).json({
+        error: "DashScope 未返回可用图片 URL",
+        code: "DASHSCOPE_IMAGE_URL_MISSING",
+        model: DASHSCOPE_IMAGE_MODEL,
+      });
     }
 
   } catch (error) {
     console.error("[ZenFortune Image] 生成失败:", error);
-    const title = req.body.title || "temp";
-    return res.json({ imageUrl: `https://picsum.photos/seed/${encodeURIComponent(title)}/600/600` });
+    return res.status(500).json({
+      error: "图片生成服务异常",
+      code: "IMAGE_GENERATION_EXCEPTION",
+    });
   }
 });
 

@@ -79,15 +79,24 @@ export default function App() {
   const [slipImage, setSlipImage] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [showImageModal, setShowImageModal] = useState<boolean>(false);
+  const isPlaceholderImage = (url?: string) => Boolean(url?.includes("picsum.photos"));
+
+  const sanitizeFortuneRecord = (record: FortuneResult): FortuneResult => {
+    if (!isPlaceholderImage(record.imageUrl)) return record;
+    const { imageUrl, ...cleanRecord } = record;
+    return cleanRecord;
+  };
+
+  const sanitizeFortuneRecords = (records: FortuneResult[]) => records.map(sanitizeFortuneRecord);
 
 
 
 
 
-  // Retrieve matching visual scene from back-end Gemini endpoint
+  // Retrieve matching visual scene from the back-end DashScope endpoint.
   const retrieveSlipImage = async (result: FortuneResult) => {
     // If we already have a cached image URL for this record, use it directly
-    if (result.imageUrl) {
+    if (result.imageUrl && !isPlaceholderImage(result.imageUrl)) {
       setSlipImage(result.imageUrl);
       setShowImageModal(true);
       return;
@@ -95,26 +104,30 @@ export default function App() {
 
     setIsGeneratingImage(true);
     setSlipImage(null);
-    let finalUrl = "";
+    let finalUrl: string | null = null;
     try {
       const response = await fetch("/api/fortune/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: result.title, poetry: result.poetry, recordId: result.id })
       });
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        const data = await response.json();
+        if (!data.imageUrl || isPlaceholderImage(data.imageUrl)) {
+          throw new Error("Image endpoint did not return a real generated image.");
+        }
         finalUrl = data.imageUrl;
       } else {
-        throw new Error("Image server returned bad response code");
+        throw new Error(data.error || "Image server returned bad response code");
       }
     } catch (e) {
       console.error("Retrieve slip image failed:", e);
-      // Fallback with Picsum seed
-      finalUrl = `https://picsum.photos/seed/${encodeURIComponent(result.title)}/600/600`;
+      notify("水墨意境图生成失败，请检查部署环境的 DASHSCOPE_API_KEY 与函数日志。");
     } finally {
       setIsGeneratingImage(false);
     }
+
+    if (!finalUrl) return;
 
     setSlipImage(finalUrl);
     setShowImageModal(true);
@@ -187,7 +200,9 @@ export default function App() {
       const stored = localStorage.getItem("zenfortune_history_guest");
       if (stored) {
         try {
-          setHistoryRecords(JSON.parse(stored));
+          const sanitized = sanitizeFortuneRecords(JSON.parse(stored));
+          setHistoryRecords(sanitized);
+          localStorage.setItem("zenfortune_history_guest", JSON.stringify(sanitized));
         } catch (e) {
           setHistoryRecords([]);
         }
@@ -205,7 +220,7 @@ export default function App() {
       });
       if (response.ok) {
         const data = await response.json();
-        setHistoryRecords(data.records || []);
+        setHistoryRecords(sanitizeFortuneRecords(data.records || []));
       } else {
         console.error("Failed to fetch history:", response.statusText);
         setHistoryRecords([]);
@@ -239,17 +254,18 @@ export default function App() {
       // Guest mode: save to localStorage
       const stored = localStorage.getItem("zenfortune_history_guest");
       const existing = stored ? JSON.parse(stored) : [];
-      existing.unshift(record);
+      existing.unshift(sanitizeFortuneRecord(record));
       localStorage.setItem("zenfortune_history_guest", JSON.stringify(existing));
     }
-    return record;
+    return sanitizeFortuneRecord(record);
   };
 
   // Wrapper to update local state after saving
   const saveRecords = (records: FortuneResult[]) => {
-    setHistoryRecords(records);
+    const sanitized = sanitizeFortuneRecords(records);
+    setHistoryRecords(sanitized);
     if (!currentUser?.token) {
-      localStorage.setItem("zenfortune_history_guest", JSON.stringify(records));
+      localStorage.setItem("zenfortune_history_guest", JSON.stringify(sanitized));
     }
   };
 
@@ -1353,8 +1369,8 @@ export default function App() {
                             onClick={() => {
                               setCurrentResult(rec);
                               setShowResultModal(true);
-                              // Use cached image if available, otherwise generate
-                              if (rec.imageUrl) {
+                              // Use cached generated image if available, otherwise regenerate.
+                              if (rec.imageUrl && !isPlaceholderImage(rec.imageUrl)) {
                                 setSlipImage(rec.imageUrl);
                               } else {
                                 retrieveSlipImage(rec);

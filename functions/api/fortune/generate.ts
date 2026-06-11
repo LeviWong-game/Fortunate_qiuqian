@@ -1,28 +1,32 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { deepseek } from "../_lib/deepseek";
-import { PRESET_SLIPS, CATEGORY_MAP } from "../_lib/preset-slips";
+import { createDeepSeekChatCompletion } from "../../../server/lib/deepseek";
+import { CATEGORY_MAP, PRESET_SLIPS } from "../../../server/lib/preset-slips";
+import { jsonResponse, optionsResponse, readJsonBody, type PagesContext } from "../../_lib/http";
 
-export const maxDuration = 60; // 允许函数最长运行 60 秒，防止大模型超时
+type GenerateBody = {
+  category: string;
+  question: string;
+  mentalState: string;
+  recentEvents: string;
+};
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+export const onRequestOptions = () => optionsResponse();
 
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+export const onRequestPost = async ({ request, env }: PagesContext) => {
+  const {
+    category = "general",
+    question = "",
+    mentalState = "",
+    recentEvents = "",
+  } = await readJsonBody<GenerateBody>(request);
 
-  const { category = "general", question = "", mentalState = "", recentEvents = "" } = req.body || {};
   const categoryCh = CATEGORY_MAP[category] || CATEGORY_MAP.general;
   const randomSeed = PRESET_SLIPS[Math.floor(Math.random() * PRESET_SLIPS.length)];
 
-  // ── No DeepSeek → local preset fallback ──
-  if (!deepseek) {
+  const localFallback = () => {
     const tailors = [
       { prefix: "目下时序交替，", suffix: "如晨雾般徐徐消散，明哲自守即行通坦。" },
       { prefix: "静观天象流转，", suffix: "在深沉内省中，机缘已经于无形中滋长，唯待春雷一声惊醒。" },
-      { prefix: "乾坤有常，行藏有度。", suffix: "顺应内在感召，当下的细微波动是福非祸，静心则明智自生。" }
+      { prefix: "乾坤有常，行藏有度。", suffix: "顺应内在感召，当下的细微波动是福非祸，静心则明智自生。" },
     ];
     const tailor = tailors[Math.floor(Math.random() * tailors.length)];
 
@@ -35,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       personalizedExp += `近期您的${categoryCh}宏观气运正投射着《${randomSeed.title}》之象。${randomSeed.meaning}保持虚静灵台，顺道顺理，大吉自至。`;
     }
 
-    return res.status(200).json({
+    return {
       title: randomSeed.title,
       poetry: randomSeed.poetry,
       category,
@@ -45,14 +49,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       advice: [
         "心理自我调节：端坐静思，深吸慢呼，于呼吸吐纳间将情绪杂染排出乾坤，稳住信念本真。",
         randomSeed.advice,
-        "身心自律指引：远离不必要的喧嚣争执，近期以守为主，退一步海阔天空，顺应自然节律。"
-      ]
-    });
+        "身心自律指引：远离不必要的喧嚣争执，近期以守为主，退一步海阔天空，顺应自然节律。",
+      ],
+    };
+  };
+
+  if (!env.DEEPSEEK_API_KEY) {
+    return jsonResponse(localFallback());
   }
 
-  // ── DeepSeek V4 Flash — Two-Stage Role Play ──
   try {
-    // Single Stage: Fortune Teller & Poet
     const systemPrompt = `你是一位德高望重、名满天下的华夏占卜宗师与古典诗词大家。
 你精通梅花易数等传统命理术数，同时擅长七言绝句的创作。
 
@@ -82,8 +88,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 请运用你的命理智慧与诗词造诣，为用户进行深度占卜推演并赋诗。`;
 
-    const response = await deepseek.chat.completions.create({
-      model: "deepseek-chat", // 使用官方正确的模型名称，避免 404 报错
+    const completion = await createDeepSeekChatCompletion(env, {
+      model: "deepseek-chat",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -93,36 +99,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       response_format: { type: "json_object" },
     });
 
-    const responseText = response.choices[0]?.message?.content?.trim() || "{}";
+    const responseText = completion?.choices?.[0]?.message?.content?.trim() || "{}";
     const result = JSON.parse(responseText);
+    const poetry = (result.poetry || randomSeed.poetry).replace(/^[""\"《》\s]+/, "").replace(/[""\"《》\s]+$/, "");
 
-    let poetry = result.poetry || randomSeed.poetry;
-    poetry = poetry.replace(/^[""\"《》\s]+/, "").replace(/[""\"《》\s]+$/, "");
-
-    return res.status(200).json({
+    return jsonResponse({
       title: result.title || randomSeed.title,
       poetry,
       category,
       categoryLabel: CATEGORY_MAP[category],
       stamp: result.stamp || randomSeed.stamp,
       explanation: result.explanation || randomSeed.meaning,
-      advice: result.advice?.length > 0 ? result.advice : [randomSeed.advice]
+      advice: result.advice?.length > 0 ? result.advice : [randomSeed.advice],
     });
-
   } catch (error) {
     console.error("[ZenFortune] DeepSeek 调用失败，回退到本地预设签文：", error);
-    return res.status(200).json({
-      title: randomSeed.title,
-      poetry: randomSeed.poetry,
-      category,
-      categoryLabel: CATEGORY_MAP[category],
-      stamp: randomSeed.stamp,
-      explanation: `【因缘投射，神清志合】\n基于用户当前的情绪心境(${mentalState || "平常心"})与近期的境遇(${recentEvents || "常规琐事"})，当下的因缘投合了这面《${randomSeed.title}》古签。未来气运在起伏中趋向清明。只要注意静心克己、减少焦躁，未来的小纠葛都会如风刮浮云般退散消融，逐步获得福缘好事。`,
-      advice: [
-        "心理自我调节：调匀呼吸，于安宁中觉察当下的起心动念，不急流，不攀缘。",
-        "静气克己：遇到外界的摩擦或喜事，克制自己的情绪冲动，保持淡泊以自重。",
-        "正念回向：在心底祝福所遇到的每一个人，以广阔无私的布施精神破除执念，增添气运。"
-      ]
-    });
+    return jsonResponse(localFallback());
   }
-}
+};
+
+export const onRequest = () => jsonResponse({ error: "Method not allowed" }, 405);
+
