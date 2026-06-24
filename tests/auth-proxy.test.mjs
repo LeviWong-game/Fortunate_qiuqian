@@ -15,10 +15,12 @@ test("auth endpoints are proxied through Cloudflare Pages Functions", () => {
   const signup = read("functions/api/auth/signup.ts");
   const login = read("functions/api/auth/login.ts");
 
-  assert.match(signup, /auth\.signUp/);
-  assert.match(login, /auth\.signInWithPassword/);
+  assert.match(signup, /\/auth\/v1\/signup/);
+  assert.match(login, /\/auth\/v1\/token\?grant_type=password/);
   assert.match(signup, /VITE_SUPABASE_ANON_KEY/);
   assert.match(login, /VITE_SUPABASE_ANON_KEY/);
+  assert.doesNotMatch(signup, /@supabase\/supabase-js/);
+  assert.doesNotMatch(login, /@supabase\/supabase-js/);
 });
 
 test("login form calls local auth proxy instead of browser-to-Supabase auth", () => {
