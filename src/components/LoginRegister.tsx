@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { User, Lock, Sparkles, Compass, AlertCircle, RefreshCw, CheckCircle2, ArrowRight } from "lucide-react";
 import { User as UserType } from "../types";
-import { supabase } from "../lib/supabase";
 
 interface LoginRegisterProps {
   onSuccess: (user: UserType, message: string) => void;
@@ -25,6 +24,24 @@ export default function LoginRegister({ onSuccess, onSkip }: LoginRegisterProps)
     const encoded = encodeURIComponent(name.toLowerCase().replace(/\s+/g, "_"))
       .replace(/%/g, "x"); // replace % with 'x' to form a clean alphanumeric local-part
     return `${encoded}@zenfortune.local`;
+  };
+
+  const requestAuth = async (
+    endpoint: "/api/auth/login" | "/api/auth/signup",
+    payload: Record<string, string>
+  ) => {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.error || "认证服务暂时不可用");
+    }
+
+    return data;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,19 +77,11 @@ export default function LoginRegister({ onSuccess, onSkip }: LoginRegisterProps)
       const email = usernameToEmail(cleanUser);
 
       if (isLogin) {
-        // --- Login via Supabase Auth ---
-        const { data, error } = await supabase.auth.signInWithPassword({
+        // --- Login via Cloudflare Auth Proxy ---
+        const data = await requestAuth("/api/auth/login", {
           email,
           password,
         });
-
-        if (error) {
-          // Translate common Supabase auth errors to Chinese
-          if (error.message.includes("Invalid login credentials")) {
-            throw new Error("斋号或护法神咒有误，请检查后重试");
-          }
-          throw new Error(error.message);
-        }
 
         if (data.user && data.session) {
           const user: UserType = {
@@ -88,23 +97,12 @@ export default function LoginRegister({ onSuccess, onSkip }: LoginRegisterProps)
           }, 800);
         }
       } else {
-        // --- Register via Supabase Auth ---
-        const { data, error } = await supabase.auth.signUp({
+        // --- Register via Cloudflare Auth Proxy ---
+        const data = await requestAuth("/api/auth/signup", {
           email,
           password,
-          options: {
-            data: {
-              username: cleanUser, // Store display name in user metadata
-            },
-          },
+          username: cleanUser,
         });
-
-        if (error) {
-          if (error.message.includes("already registered") || error.message.includes("already been registered")) {
-            throw new Error("此斋号已被占，请重立斋号");
-          }
-          throw new Error(error.message);
-        }
 
         if (data.user && data.session) {
           // Auto-login after registration (Supabase signUp returns a session when email confirmation is disabled)
