@@ -35,7 +35,11 @@ import {
 import { CategoryId, FortuneResult, User as UserType } from "./types";
 import { CATEGORIES, RETRIEVING_TXT } from "./data";
 import LoginRegister from "./components/LoginRegister";
+import DivinationRitualOverlay from "./components/DivinationRitualOverlay";
 import { supabase } from "./lib/supabase";
+
+const FORTUNE_TUBE_IMAGE = "/media/fortune-tube-transparent.png";
+const FORTUNE_TUBE_RITUAL_VIDEO = "/media/fortune-tube-ritual.mp4";
 
 export default function App() {
   // Navigation & Screen states
@@ -658,7 +662,7 @@ export default function App() {
                 playRattleSound();
                 setShowSplash(false);
               }}
-              className="relative w-40 h-40 sm:w-44 sm:h-44 flex items-center justify-center animate-float cursor-pointer hover:scale-105 transition-all duration-300"
+              className="relative w-40 h-60 sm:w-44 sm:h-64 flex items-center justify-center animate-float cursor-pointer hover:scale-105 transition-all duration-300"
             >
               {/* Soft Golden Halo behind the tube */}
               <div className="absolute inset-0 rounded-full bg-accent-gold/15 blur-2xl scale-75"></div>
@@ -666,8 +670,8 @@ export default function App() {
               <img 
                 id="splash-tube-img"
                 alt="Zen Fortune Tube" 
-                className="w-11/12 h-11/12 object-contain relative z-10 drop-shadow-[0_12px_24px_rgba(0,0,0,0.08)]" 
-                src="https://lh3.googleusercontent.com/aida/AP1WRLuAVLPghdkUg-aL1UR4wIhDsZIyRkTNiYIiejdx-gRJo9kH3LLQuuj97v3vew639NOBmbdLYTqPx-YV-SpgIHVarOjJlGTO-P1YntiqD_SgdO2tOWnpGIoFlniAX7CKgsBn_mhxBY6z8FtFgiUrmmuCIwR0Km7574XQCQyIJTmkyH9W_88CJl7EfPKvRexAEDS31ygSDF_2bO8Gc5Rn_4pSH8YvE_RwqrbwOG78Kajdfa9cbxS46BFY1bs"
+                className="w-full h-full object-contain relative z-10 drop-shadow-[0_12px_24px_rgba(0,0,0,0.12)]"
+                src={FORTUNE_TUBE_IMAGE}
               />
               <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-2/3 h-2 bg-deep-ink/5 blur-md rounded-[100%]"></div>
             </div>
@@ -809,7 +813,7 @@ export default function App() {
                       id="home-mini-tube-img"
                       alt="Mini Divination Tube" 
                       className="w-full h-full object-contain animate-float drop-shadow-[0_10px_20px_rgba(0,0,0,0.06)]"
-                      src="https://lh3.googleusercontent.com/aida/AP1WRLuAVLPghdkUg-aL1UR4wIhDsZIyRkTNiYIiejdx-gRJo9kH3LLQuuj97v3vew639NOBmbdLYTqPx-YV-SpgIHVarOjJlGTO-P1YntiqD_SgdO2tOWnpGIoFlniAX7CKgsBn_mhxBY6z8FtFgiUrmmuCIwR0Km7574XQCQyIJTmkyH9W_88CJl7EfPKvRexAEDS31ygSDF_2bO8Gc5Rn_4pSH8YvE_RwqrbwOG78Kajdfa9cbxS46BFY1bs"
+                      src={FORTUNE_TUBE_IMAGE}
                     />
                   </div>
                   <div>
@@ -1204,37 +1208,34 @@ export default function App() {
                      </svg>
                   </div>
 
-                  {/* Central Circular Feature Card */}
-                  <div className="absolute left-1/2 top-[50%] -translate-x-1/2 -translate-y-1/2 z-20">
-                    <div className={`relative w-32 h-32 rounded-full bg-parchment-high/90 border border-vermilion/30 overflow-hidden shadow-[0_0_20px_rgba(239,68,68,0.08)] flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ${isRecording ? 'scale-105 shadow-[0_0_30px_rgba(239,68,68,0.2)] bg-vermilion/5 border-vermilion/50' : 'hover:scale-[1.03]'} ${isShaking ? 'animate-pulse scale-95 shadow-none' : ''}`}
-                         onClick={handleVoiceToggle}
-                    >
-                      {/* Concentric rings to make it look like a celestial map center */}
-                      <div className={`absolute inset-3 rounded-full border top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-parchment-dim border-dashed transition-all duration-1000 pointer-events-none ${isRecording ? 'rotate-180 scale-105' : 'animate-[spin_20s_linear_infinite]'}`}></div>
-                      <div className={`absolute inset-5 rounded-full border top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-accent-gold/20 transition-all duration-1000 pointer-events-none ${isRecording ? '-rotate-180 scale-95' : 'animate-[spin_15s_linear_infinite_reverse]'}`}></div>
-                      
-                      <div className="relative z-10 flex flex-col items-center">
-                        {isRecording ? (
-                          <>
-                             <Radio className="w-8 h-8 text-vermilion animate-ping absolute opacity-20"/>
-                             <Mic className="w-8 h-8 text-vermilion" />
-                             <span className="text-[10px] font-bold tracking-widest text-vermilion mt-2 uppercase">倾听凡音...</span>
-                          </>
-                        ) : isShaking ? (
-                          <>
-                             <Compass className="w-8 h-8 text-accent-gold animate-[spin_1.5s_ease-in-out_infinite]" />
-                             <span className="text-[10px] font-bold tracking-widest text-accent-gold mt-2 uppercase">解构天机...</span>
-                          </>
-                        ) : (
-                          <>
-                             {/* Central icon */}
-                             <Mic className="w-7 h-7 text-deep-ink/50" />
-                             <span className="text-[9px] font-bold tracking-widest text-deep-ink/60 mt-2 uppercase border border-parchment-dim/40 bg-parchment-dim/20 px-2 py-0.5 rounded-full text-center leading-none">点击倾诉<br/><span className="text-[7px] opacity-70">卜问天机</span></span>
-                          </>
-                        )}
+                  {/* Central voice control; the full-screen ritual replaces it while shaking. */}
+                  {!isShaking && (
+                    <div className="absolute left-1/2 top-[50%] z-20 -translate-x-1/2 -translate-y-1/2">
+                      <div
+                        className={`relative flex h-32 w-32 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-full border border-vermilion/30 bg-parchment-high/90 shadow-[0_0_20px_rgba(239,68,68,0.08)] transition-all duration-300 ${isRecording ? 'scale-105 border-vermilion/50 bg-vermilion/5 shadow-[0_0_30px_rgba(239,68,68,0.2)]' : 'hover:scale-[1.03]'}`}
+                        onClick={handleVoiceToggle}
+                      >
+                        <div className={`pointer-events-none absolute left-1/2 top-1/2 inset-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-parchment-dim transition-all duration-1000 ${isRecording ? 'rotate-180 scale-105' : 'animate-[spin_20s_linear_infinite]'}`} />
+                        <div className={`pointer-events-none absolute left-1/2 top-1/2 inset-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-accent-gold/20 transition-all duration-1000 ${isRecording ? '-rotate-180 scale-95' : 'animate-[spin_15s_linear_infinite_reverse]'}`} />
+                        <div className="relative z-10 flex flex-col items-center">
+                          {isRecording ? (
+                            <>
+                              <Radio className="absolute w-8 h-8 text-vermilion opacity-20 animate-ping" />
+                              <Mic className="w-8 h-8 text-vermilion" />
+                              <span className="mt-2 text-[10px] font-bold tracking-widest text-vermilion uppercase">倾听凡音...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mic className="w-7 h-7 text-deep-ink/50" />
+                              <span className="mt-2 rounded-full border border-parchment-dim/40 bg-parchment-dim/20 px-2 py-0.5 text-center text-[9px] font-bold leading-none tracking-widest text-deep-ink/60 uppercase">
+                                点击倾诉<br/><span className="text-[7px] opacity-70">卜问天机</span>
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Voice Transcript Output / Progress Display */}
                   <div className="text-center min-h-[60px] w-full mt-auto z-20 relative px-4 text-deep-ink">
@@ -1959,6 +1960,15 @@ export default function App() {
             </button>
           </footer>
         </div>
+      )}
+
+      {isShaking && (
+        <DivinationRitualOverlay
+          progress={shakeProgress}
+          message={retrievingText}
+          videoSrc={FORTUNE_TUBE_RITUAL_VIDEO}
+          posterSrc={FORTUNE_TUBE_IMAGE}
+        />
       )}
 
       {/* 1:1 Image Fullscreen Modal */}
