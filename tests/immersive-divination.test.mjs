@@ -42,3 +42,11 @@ test("active ritual renders a full viewport overlay with a media fallback", () =
   assert.equal((overlay.match(/<video/g) ?? []).length, 1);
   assert.match(styles, /@keyframes ritual-mist-drift/);
 });
+
+test("supabase client uses statically replaceable Vite environment variables", () => {
+  const supabaseClient = read("src/lib/supabase.ts");
+
+  assert.match(supabaseClient, /import\.meta\.env\.VITE_SUPABASE_URL/);
+  assert.match(supabaseClient, /import\.meta\.env\.VITE_SUPABASE_ANON_KEY/);
+  assert.doesNotMatch(supabaseClient, /\(import\.meta as any\)\.env/);
+});
