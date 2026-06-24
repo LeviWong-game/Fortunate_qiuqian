@@ -3,8 +3,11 @@
   "name": "zenfortune",
   "compatibility_date": "2026-06-11",
   "pages_build_output_dir": "./dist",
+  "vars": {
+    "VITE_SUPABASE_URL": "https://tnbrnnswyzwrjohnpaeg.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "sb_publishable_Gmgf1a4rK5McIKrMkmSgOg_8b1iUimP"
+  },
   "observability": {
     "enabled": true
   }
 }
-
